@@ -1,0 +1,236 @@
+<!--
+  VR d20 dice
+
+  Author: Gavan Wilhite
+  Copyright (c) 2014 Altspace VR
+
+  http://localhost:8002/v20-dice/index.html
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Gophers</title>
+
+    <script src="http://sdk.altvr.com/lib/three.min.js"></script>
+
+    <!-- Needed by AltOBJLoader.js -->
+    <script src="http://sdk.altvr.com/lib/OBJMTLLoader.js"></script>
+    <script src="http://sdk.altvr.com/lib/MTLLoader.js"></script>
+
+    <script src="http://sdk.altvr.com/src/AltOBJMTLLoader.js"></script>
+    <script src="http://sdk.altvr.com/src/AltRenderer.js"></script>
+
+    <script src="http://sdk.altvr.com/src/cursor/CursorEvents.js"></script>
+    <script src="http://sdk.altvr.com/src/cursor/ColorHoverEffect.js"></script>
+    <script src="http://sdk.altvr.com/src/cursor/DragPlaneEffect.js"></script>
+    
+    <script src="http://threejs.org/examples/js/libs/tween.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/latest/easing/EasePack.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenLite.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TweenMax.min.js"></script>
+    <script src="http://cdnjs.cloudflare.com/ajax/libs/gsap/latest/TimelineLite.min.js"></script>
+</head>
+<body>
+    <style>
+      body {
+        background-color: rgba(0, 0, 0, 0);
+        margin: 0px;
+        overflow: hidden;
+        color: #FFFFFF;
+        font-family: Monospace;
+        font-size: 18px;
+        text-align: center;
+      }
+      #info {
+        position: absolute;
+        top: 0px;
+        width: 100%;
+        padding: 10px;
+      }
+    </style>
+</body>
+
+<script>
+
+var inAltspace = window.hasOwnProperty('altspace');
+
+var scene, renderer, camera;
+var gopher = [];
+var mallet;
+var woodBox;
+var dragPlane;
+var cursorEvents;
+var dragPlane;
+
+var malletAnimation;
+var moveMalletAnimation;
+var gopherAnimations = {};
+var hitAnimations = {};
+
+var malletCanMove = true;
+var ASSETS_DIR = "assets/";
+var loader;
+var originalTint;
+
+var score = 0;
+
+function initScene() {
+  scene = new THREE.Scene();
+  loader = new THREE.AltOBJMTLLoader();
+  loadModels();
+  if(inAltspace){
+    console.log("In Altspace!");
+    renderer = altspace.getThreeJSRenderer();
+  }
+  else{
+    renderer = new THREE.WebGLRenderer();
+    renderer.setClearColor("#AAAAAA");
+    renderer.setSize( window.innerWidth, window.innerHeight );
+    document.body.appendChild( renderer.domElement );
+    var aspect = window.innerWidth / window.innerHeight;
+    camera = new THREE.PerspectiveCamera(45, aspect, 1, 2000 );
+    camera.position.z = 10 * cubeHeight;
+    camera.position.y = 500;
+    camera.lookAt( scene.position );
+    var ambient = new THREE.AmbientLight( 0xffffff );
+    scene.add( ambient );
+  }
+}
+
+function loadModels(){
+  loader.load(ASSETS_DIR + "gopher.obj", function ( loadedObject ) {
+    gopher[0] = loadedObject;
+    gopher[0].scale.set(13, 13, 13);
+    gopher[0].rotation.y = Math.PI / 2;
+    originalTint = gopher[0].userData.tintColor;
+    for(var i = 0; i < 6; i+=2){
+      gopher[i] = gopher[0].clone();
+      gopher[i+1] = gopher[0].clone();
+      gopher[i].position.set(-90, -500, -200 + (i%3)*200);
+      gopher[i+1].position.set(90, -500, -200 + (i%3)*200);
+    }
+    loader.load(ASSETS_DIR + "mallet.obj", function ( loadedObject ) {
+      mallet = loadedObject;
+      mallet.scale.set(50, 50, 50);
+      mallet.position.y = -300;
+      mallet.position.x = 200;
+      mallet.position.z = -350;
+      loader.load(ASSETS_DIR + "wood_box.obj", function ( loadedObject ) {
+          console.log("loaded models");
+          woodBox = loadedObject;
+          woodBox.scale.set(60, 60, 60);
+          woodBox.position.y = -450;
+          for(var i = 0; i < 6; i++){
+            scene.add(gopher[i]);
+          }
+          scene.add(mallet);
+          scene.add(woodBox);
+          createAnimations();
+          initEvents();
+          // animate();
+      });
+    });
+  });
+}
+
+function createAnimations(){
+  malletAnimation = new TimelineLite({paused:true});
+  malletAnimation.to(mallet.rotation, 0.3, {z: Math.PI/2, ease:Sine.easeIn});
+  malletAnimation.to(mallet.rotation, 1.0, {z: 0, ease:Power1.easeOut, onComplete: setMallet}, "+=0.1");
+  moveMalletAnimation = new TimelineLite();
+  for(var i = 0; i < 6; i++){
+    gopherAnimations[i] = new TimelineLite({paused:true});
+    gopherAnimations[i].to(gopher[i].position, 1.0, {y: -450, ease:Power2.easeOut});
+    gopherAnimations[i].to(gopher[i].position, 0.6, {y: -500, ease:Power2.easeIn, onComplete: moveGopher}, "+=0.2");
+  }
+
+  for(var i = 0; i < 6; i++){
+    hitAnimations[i] = new TimelineLite({paused:true});
+    hitAnimations[i].to(gopher[i].position, 0.15, {y: -500, ease:Power2.easeIn, onComplete: resumeGopher, onCompleteParams:[i]}, "+=0.3");
+  }
+}
+
+
+function setMallet(){
+  malletCanMove = true;
+}
+
+function animate(){
+  window.requestAnimationFrame(animate);
+  // cursorEvents.update();
+}
+
+function render(){
+    renderer.render(scene);
+    checkGopherCollisions();
+}
+
+function moveGopher(){
+  var index = getRandomIntInclusive(0, 6);
+  gopherAnimations[index].play();
+  gopherAnimations[index].restart();
+}
+
+function resumeGopher(index){
+  setGopherColor(index, originalTint);
+  moveGopher();
+}
+
+function checkGopherCollisions(){
+  for(var i = 0; i < 6; i++){
+    var ray = new THREE.Raycaster(gopher[i].position, new THREE.Vector3(0, 1, 0));
+    var c = ray.intersectObjects([mallet], true);
+    if(c.length > 0 && c[0].distance <= 110){
+      gopherAnimations[i].stop();
+      hitAnimations[i].play();
+      hitAnimations[i].restart();
+      score++;
+      setGopherColor(i, { r: 0.5, g: 0.1, b: 0.1 });
+      break;
+    }
+  }
+}
+
+function initEvents() {
+  // cursorEvents = new CursorEvents();
+  TweenLite.ticker.addEventListener("tick", render);
+  moveGopher();
+  var geometry = new THREE.BoxGeometry(1000, 0.1, 1000);
+  var material = new THREE.MeshBasicMaterial( {color: 0xffff00, side: THREE.DoubleSide} );
+  var plane = new THREE.Mesh( geometry, material );
+  plane.position.y = -405;
+  scene.add( plane );
+  scene.addEventListener('cursormove', function(args){
+    var cRay = args.cursorRay.direction;
+    var cEye = args.cursorRay.origin;
+    var ray = new THREE.Vector3(cRay.x, cRay.y, cRay.z);
+    var eye = new THREE.Vector3(cEye.x, cEye.y, cEye.z);
+    var line = new THREE.Raycaster(eye, ray.normalize());
+    var intersects = line.intersectObjects([plane], true);
+    if(intersects.length > 0){
+      var new_x = intersects[0].point.x + 220;
+      var new_z = intersects[0].point.z;
+      mallet.position.set(new_x, mallet.position.y, new_z);
+    }
+  });
+  scene.addEventListener('cursordown', function(args){
+    if (malletCanMove){
+      malletCanMove = false;
+      malletAnimation.play();
+      malletAnimation.restart();
+    }
+  });
+}
+
+function getRandomIntInclusive(min, max) {
+  return Math.floor(Math.random() * (max - min)) + min;
+}
+
+function setGopherColor(index, color){
+  gopher[index].userData.tintColor = color;
+}
+
+initScene();
+</script>
+</body>
+</html>

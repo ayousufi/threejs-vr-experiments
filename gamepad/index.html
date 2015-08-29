@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Gamepad Test</title>
+    <meta charset="utf-8">
+    <script src="http://sdk.altvr.com/lib/three.min.js"></script>
+    <script src="http://sdk.altvr.com/src/AltRenderer.js"></script>
+    <style>
+    </style>
+  </head>
+  <body>
+    <script>
+      var inAltspace = window.hasOwnProperty('altspace');
+      var scene, camera, renderer;
+      var haveEvents = 'ongamepadconnected' in window;
+      var controllers = {};
+      var buttons = [];
+      var axes = [];
+      function initScene(){
+        scene = new THREE.Scene();
+        if(inAltspace){
+          renderer = altspace.getThreeJSRenderer({version: '0.2.0'});
+        }
+        else{
+          renderer = new THREE.WebGLRenderer();
+          var aspect = window.innerWidth / window.innerHeight;
+          camera = new THREE.PerspectiveCamera(70, aspect, 1, 1000 );
+        }
+        var container = document.createElement('div');
+        document.body.appendChild( container );
+      }
+      function addGamepadEvent(e){
+        addGamePad(e.gamepad);
+      }
+      function addGamepad(gamepad){
+        controllers[gamepad.index] = gamepad;
+        for(var i = 0; i < gamepad.buttons.length; i++){
+          var cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(50, 50, 50), new THREE.MeshBasicMaterial());
+          cubeMesh.position.set(-1100 + i * 150, 0, 0);
+          cubeMesh.userData.tintColor = {r: 1, g: 0, b: 0};
+          buttons[i] = cubeMesh;
+          scene.add(cubeMesh);
+        }
+        for(var i = 0; i < gamepad.axes.length; i++){
+          var sphereMesh = new THREE.Mesh(new THREE.SphereGeometry(25, 32, 32), new THREE.MeshBasicMaterial());
+          sphereMesh.position.set(-250 + i * 150, -300, 0);
+          sphereMesh.userData.tintColor = {r: 1, g: 0, b: 0};
+          axes[i] = sphereMesh;
+          scene.add(sphereMesh);
+        }
+      }
+      function removeGamepadEvent(e){
+        removeGamepadEvent(e.gamepad);
+      }
+      function removeGamepad(gamepad){
+        delete controllers[gamepad.index];
+      }
+
+      function updateControllers(){
+        if(!haveEvents){
+          scanGamepads();
+        }
+        for(var c in controllers){
+          // buttons
+          var controller = controllers[c];
+          for(var i = 0; i < controller.buttons.length; i++){
+            var val = controller.buttons[i];
+            var pressed = val == 1.0;
+            if(typeof(val) == "object"){
+              pressed = val.pressed;
+              val = val.value;
+            }              
+            if(pressed){
+              buttons[i].userData.tintColor = {r: 0, g: val, b: 0}
+            }
+            else{
+              buttons[i].userData.tintColor = {r: 1, g: 0, b: 0}
+            }
+          }
+          // axes
+          for(var i = 0; i < controller.axes.length; i++){
+            axes[i].scale.set(1.5 + controller.axes[i], 1.5 + controller.axes[i], 1.5 + controller.axes[i]);
+          }
+        }
+      }
+
+      function scanGamepads(){
+        var gamepads = navigator.getGamepads ? navigator.getGamepads() : (navigator.webkitGetGamepads ? navigator.webkitGetGamepads() : []);
+        for(var i = 0; i < gamepads.length; i++){
+          if (gamepads[i]) {
+            if(gamepads[i].index in controllers){
+              controllers[gamepads[i].index] = gamepads[i];
+            }
+            else{
+              addGamepad(gamepads[i])
+            }
+          }
+        }
+      }
+
+      function animate(){
+        requestAnimationFrame(animate);
+        updateControllers();
+        renderer.render(scene, camera);
+      }
+
+      function initGamepad(){
+        window.addEventListener("gamepadconnected", addGamepadEvent);
+        window.addEventListener("gamepaddisconnected", removeGamepadEvent);
+        if(!haveEvents){
+          setInterval(scanGamepads, 500);
+        }
+      }
+
+      initScene();
+      initGamepad();
+      animate();
+    </script>
+  </body>
+</html>
