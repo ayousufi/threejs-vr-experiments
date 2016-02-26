@@ -15,8 +15,8 @@
     </style>
   </head>
   <body>
-<video id="myVideo" autoplay loop>
-  <source src="bone_web.ogv" type='video/ogg; codecs="theora, vorbis"'>
+<video id="myVideo" autoplay loop style="display: none" muted>
+  <source src="bone2.mp4" type='video/ogg; codecs="theora, vorbis"'>
 </video>
     <!--video id="myVideo" autoplay loop controls>
       <source src="bone_web.mp4" type='video/mp4; codecs="avc1.42E01E, mp4a.40.2"'>
@@ -48,15 +48,14 @@
         // video.play();
 
         videoImage = document.createElement( 'canvas' );
-        videoImage.width = 269;
-        videoImage.height = 129;
-        // videoImage.width = 256;
-        // videoImage.height = 129;
+        videoImage.width = 854;
+        videoImage.height = 435;
         videoImageContext = videoImage.getContext('2d');
         videoImageContext.fillStyle = "#000000";
         videoImageContext.fillRect(0, 0, videoImage.width, videoImage.height);
 
         videoTexture = new THREE.Texture(videoImage);
+        videoTexture.flipY = false;
         videoTexture.minFilter = THREE.LinearFilter;
         videoTexture.maxFilter = THREE.LinearFilter;
 
@@ -67,7 +66,8 @@
         else{
           var sphereGeo = new THREE.SphereGeometry(500, 32, 32);
           var movieMaterial = new THREE.MeshBasicMaterial( {map: videoTexture, overdraw: true, side: THREE.DoubleSide});
-          model = new THREE.Mesh(sphereGeo, movieMaterial);          
+          model = new THREE.Mesh(sphereGeo, movieMaterial);        
+          model.rotation.z += Math.PI;
         }
         scene.add(model);
       }
@@ -95,12 +95,6 @@
       loader = new THREE.AltOBJMTLLoader();
       loader.load("sphere2.obj", function ( loadedObject ) {
         model = loadedObject;
-        // model.traverse( function (child) {
-        //       if ( child instanceof THREE.Mesh ) {
-        //           child.material.map = new THREE.ImageUtils.loadTexture('river.jpg');
-        //           child.material.needsUpdate = true;
-        //       }
-        // });
         initScene();
         animate();
       });
